@@ -56,7 +56,7 @@ cd luckyland-backend
 bun install
 
 ### Tahap 2: Konfigurasi .env 
-# Koneksi ke database PostgreSQL
+# Koneksi ke database PostgreSQL (Note untuk database_url ini ubah username dan password sesuai dengan database SQL anda)
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/luckyland?schema=public"
 
 # URL Frontend untuk keperluan CORS
