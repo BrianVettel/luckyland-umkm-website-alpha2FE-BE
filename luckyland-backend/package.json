@@ -1,0 +1,34 @@
+{
+  "name": "luckyland-backend",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "db:generate": "bunx prisma generate",
+    "db:push": "bunx prisma db push",
+    "db:migrate": "bunx prisma migrate dev",
+    "db:studio": "bunx prisma studio",
+    "db:seed": "bun run prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prisma": "6.9.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@elysiajs/bearer": "^1.4.4",
+    "@elysiajs/cookie": "^0.8.0",
+    "@elysiajs/cors": "^1.4.2",
+    "@elysiajs/jwt": "^1.4.2",
+    "@prisma/client": "6.9.0",
+    "dotenv": "^17.4.2",
+    "elysia": "^1.4.29"
+  },
+  "prisma": {
+    "seed": "bun run prisma/seed.ts"
+  }
+}

@@ -1,0 +1,594 @@
+// ============================================================
+// Lucky Land Operational Management System — Prisma Schema
+// ============================================================
+// Covers all 6 PRD modules:
+//   SL_01: POS & Order Management
+//   SL_02: Production Management
+//   SL_03: Leave & Attendance Management
+//   SL_04: Payroll Management
+//   SL_05: Raw Material Procurement
+//   SL_06: Equipment Procurement
+// ============================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+/// RBAC Roles — 5 strict roles per PRD Section 10
+enum Role {
+  OWNER
+  ADMIN
+  KASIR
+  BAKER
+  DECORATOR
+}
+
+/// FR-POS-01: Order origin channel
+enum OrderOrigin {
+  ONLINE
+  OFFLINE
+}
+
+/// FR-POS-06: Order lifecycle status
+enum OrderStatus {
+  PENDING
+  VERIFIED
+  SELESAI
+  CANCELLED
+}
+
+/// FR-POS-08: Payment tracking status
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  LUNAS
+}
+
+/// FR-PROD-02: Production task lifecycle
+enum ProductionStatus {
+  PENDING
+  IN_PROGRESS
+  DOUGH_READY
+  DECORATING
+  FINISHED
+}
+
+/// FR-LV-01: Leave/absence type categories
+enum LeaveType {
+  ANNUAL
+  SICK
+  PERSONAL
+  OTHER
+}
+
+/// FR-LV-04: Leave request approval status
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// FR-LV-10: Daily attendance state
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  ON_LEAVE
+  LATE
+}
+
+/// FR-PAY-02/08: Payroll batch lifecycle
+enum PayrollStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+  PAID
+}
+
+/// FR-PAY-10: Individual salary transfer status
+enum TransferStatus {
+  PENDING
+  TRANSFERRED
+}
+
+/// FR-RM-06 / FR-EQ-06: Procurement request lifecycle
+enum ProcurementStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RECEIVED
+}
+
+/// Discriminator for unified procurement model (SL_05 vs SL_06)
+enum ProcurementType {
+  RAW_MATERIAL
+  EQUIPMENT
+}
+
+/// FR-EQ-01: Equipment condition tracking
+enum EquipmentCondition {
+  GOOD
+  DAMAGED
+  MAINTENANCE
+}
+
+/// FR-SYS-03: Notification event types
+enum NotificationType {
+  LEAVE_REQUEST
+  LEAVE_RESOLVED
+  LOW_STOCK
+  EQUIPMENT_DAMAGED
+  PROCUREMENT_RESOLVED
+  PAYROLL_REMINDER
+  ORDER_UPDATE
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+/// Cross-cutting: User master data (FR-SYS-01, FR-SYS-02, FR-PAY-01)
+model User {
+  id              String   @id @default(cuid())
+  username        String   @unique
+  password        String   // hashed password
+  name            String
+  role            Role
+  email           String?  @unique
+  phone           String?  // WhatsApp number (FR-PAY-01)
+  bankAccount     String?  // Bank account info (FR-PAY-01)
+  basicSalary     Float    @default(0) // Monthly basic salary (FR-PAY-01)
+  leaveQuota      Int      @default(12) // Annual leave quota (FR-LV-02)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // --- Relations ---
+  // SL_01: Orders created by this user (Kasir)
+  orders             Order[]
+  // SL_02: Production tasks assigned to this user
+  productionTasks    ProductionTask[]  @relation("AssignedTo")
+  // SL_03: Leave requests submitted by this user
+  leaveRequests      LeaveRequest[]    @relation("LeaveEmployee")
+  // SL_03: Leave requests approved/rejected by this user (Owner)
+  leaveApprovals     LeaveRequest[]    @relation("LeaveApprover")
+  // SL_03: Daily attendance records
+  attendances        Attendance[]
+  // SL_04: Payroll details for this employee
+  payrollDetails     PayrollDetail[]
+  // SL_04: Payroll periods initiated by this user (Owner)
+  payrollPeriods     PayrollPeriod[]
+  // SL_05/06: Procurement requests submitted by this user
+  procurementRequests   ProcurementRequest[] @relation("ProcurementRequester")
+  // SL_05/06: Procurement requests approved by this user (Owner)
+  procurementApprovals  ProcurementRequest[] @relation("ProcurementApprover")
+  // SL_05: Material receipts confirmed by this user
+  materialReceipts      MaterialReceipt[]
+  // SL_06: Equipment receipts confirmed by this user
+  equipmentReceipts     EquipmentReceipt[]
+  // Cross-cutting: Notifications for this user
+  notifications         Notification[]
+  // Cross-cutting: Audit logs by this user
+  auditLogs             AuditLog[]
+
+  @@map("users")
+}
+
+// ============================================================
+// SL_01: POS & Order Management
+// ============================================================
+
+/// Product catalog (SL_01)
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  price       Float
+  category    String?
+  description String?
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime? // Soft delete
+
+  // --- Relations ---
+  orderItems  OrderItem[]
+
+  @@map("products")
+}
+
+/// Sales order (FR-POS-01 through FR-POS-12)
+model Order {
+  id             String        @id @default(cuid())
+  orderNumber    String        @unique @default(cuid()) // Human-readable order number
+  customerName   String        // FR-POS-02
+  origin         OrderOrigin   // FR-POS-01: ONLINE or OFFLINE
+  status         OrderStatus   @default(PENDING) // FR-POS-06
+  paymentStatus  PaymentStatus @default(PENDING) // FR-POS-08
+  orderDate      DateTime      @default(now()) // FR-POS-02
+  notes          String?       // FR-POS-02: Additional notes
+  totalAmount    Float         @default(0) // FR-POS-03: Auto-calculated
+  receiptUrl     String?       // FR-POS-10: Receipt file path
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?     // Soft delete
+
+  // FK: Created by (Kasir)
+  createdById    String
+  createdBy      User          @relation(fields: [createdById], references: [id])
+
+  // --- Relations ---
+  items          OrderItem[]
+  productionTask ProductionTask? // FR-POS-11: 1:1 link to production (online orders)
+
+  @@index([status])
+  @@index([origin])
+  @@index([orderDate])
+  @@index([createdById])
+  @@map("orders")
+}
+
+/// Order line item (FR-POS-02, FR-POS-07)
+model OrderItem {
+  id          String  @id @default(cuid())
+  quantity    Int     // FR-POS-02
+  size        String? // FR-POS-07: Product size
+  theme       String? // FR-POS-07: Cake theme/design
+  notes       String? // FR-POS-07: Item-specific notes
+  unitPrice   Float   // Snapshot of price at order time
+  subtotal    Float   // quantity * unitPrice
+
+  // FK: Parent order
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // FK: Product reference
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ============================================================
+// SL_02: Production Management
+// ============================================================
+
+/// Production task tracking (FR-PROD-01 through FR-PROD-06)
+model ProductionTask {
+  id             String           @id @default(cuid())
+  status         ProductionStatus @default(PENDING) // FR-PROD-02
+  deadline       DateTime         // FR-PROD-03: Sorting by deadline
+  startedAt      DateTime?        // When production started
+  completedAt    DateTime?        // When production finished
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // FK: Linked order (INT-01: Order -> Production)
+  orderId        String           @unique
+  order          Order            @relation(fields: [orderId], references: [id])
+
+  // FK: Assigned production worker (Baker or Decorator)
+  assignedToId   String?
+  assignedTo     User?            @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  @@index([status])
+  @@index([deadline])
+  @@index([assignedToId])
+  @@map("production_tasks")
+}
+
+// ============================================================
+// SL_03: Leave & Attendance Management
+// ============================================================
+
+/// Leave/absence request (FR-LV-01 through FR-LV-10)
+model LeaveRequest {
+  id             String      @id @default(cuid())
+  type           LeaveType   // FR-LV-01: Leave type
+  startDate      DateTime    // FR-LV-01
+  endDate        DateTime    // FR-LV-01
+  duration       Int         // FR-LV-01: Number of days
+  reason         String      // FR-LV-01
+  documentUrl    String?     // FR-LV-01: Supporting document upload
+  status         LeaveStatus @default(PENDING) // FR-LV-04
+  rejectionNotes String?     // FR-LV-07: Notes for rejection
+  resolvedAt     DateTime?   // When approved/rejected
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  // FK: Employee who submitted the request
+  employeeId     String
+  employee       User        @relation("LeaveEmployee", fields: [employeeId], references: [id])
+
+  // FK: Owner who approved/rejected (nullable until resolved)
+  approverId     String?
+  approver       User?       @relation("LeaveApprover", fields: [approverId], references: [id])
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("leave_requests")
+}
+
+/// Daily attendance record (FR-LV-10, INT-02)
+model Attendance {
+  id          String           @id @default(cuid())
+  date        DateTime         // Specific attendance date
+  status      AttendanceStatus @default(PRESENT)
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // FK: Employee
+  employeeId  String
+  employee    User             @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date]) // One record per employee per day
+  @@index([date])
+  @@map("attendances")
+}
+
+// ============================================================
+// SL_04: Payroll Management
+// ============================================================
+
+/// Monthly payroll batch (FR-PAY-02, FR-PAY-13)
+model PayrollPeriod {
+  id          String        @id @default(cuid())
+  month       Int           // 1-12
+  year        Int
+  status      PayrollStatus @default(DRAFT) // FR-PAY-02/08
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // FK: Initiated by (Owner)
+  initiatedById String
+  initiatedBy   User        @relation(fields: [initiatedById], references: [id])
+
+  // --- Relations ---
+  details     PayrollDetail[]
+
+  @@unique([month, year]) // Only one payroll per month
+  @@map("payroll_periods")
+}
+
+/// Per-employee salary breakdown (FR-PAY-05, FR-PAY-06, FR-PAY-09 through FR-PAY-12)
+model PayrollDetail {
+  id                    String         @id @default(cuid())
+  basicSalary           Float          // FR-PAY-06: Snapshot of basic salary
+  totalWorkDays         Int            @default(0) // Days worked in the period
+  totalAbsences         Int            @default(0) // Unexcused absence count
+  totalExcessiveLeave   Int            @default(0) // Leave days beyond quota
+  absenceDeduction      Float          @default(0) // FR-PAY-05
+  leaveDeduction        Float          @default(0) // FR-PAY-05
+  manualAdjustment      Float          @default(0) // FR-PAY-07: Owner correction
+  netSalary             Float          @default(0) // FR-PAY-05: Calculated net
+  transferStatus        TransferStatus @default(PENDING) // FR-PAY-10
+  transferReceiptUrl    String?        // FR-PAY-11: Upload proof
+  payslipUrl            String?        // FR-PAY-12: Generated PDF
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // FK: Parent payroll period
+  payrollPeriodId       String
+  payrollPeriod         PayrollPeriod  @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
+
+  // FK: Employee
+  employeeId            String
+  employee              User           @relation(fields: [employeeId], references: [id])
+
+  @@unique([payrollPeriodId, employeeId]) // One detail per employee per period
+  @@index([employeeId])
+  @@map("payroll_details")
+}
+
+// ============================================================
+// SL_05: Raw Material Procurement
+// ============================================================
+
+/// Raw material inventory (FR-RM-01 through FR-RM-04)
+model RawMaterial {
+  id              String   @id @default(cuid())
+  name            String
+  unit            String   // e.g., kg, liter, pcs
+  category        String?
+  currentStock    Float    @default(0) // FR-RM-01: stok_sekarang
+  minimumStock    Float    @default(0) // FR-RM-04: batas_minimum (threshold alerts)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime? // Soft delete (FR-RM-03)
+
+  // --- Relations ---
+  procurementItems  ProcurementItem[] @relation("RawMaterialItems")
+  materialReceipts  MaterialReceipt[]
+
+  @@map("raw_materials")
+}
+
+// ============================================================
+// SL_06: Equipment Procurement
+// ============================================================
+
+/// Equipment inventory (FR-EQ-01 through FR-EQ-04)
+model Equipment {
+  id              String             @id @default(cuid())
+  name            String
+  category        String?
+  quantity        Int                @default(0) // FR-EQ-01
+  condition       EquipmentCondition @default(GOOD) // FR-EQ-01
+  description     String?
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?          // Soft delete (FR-EQ-03)
+
+  // --- Relations ---
+  procurementItems  ProcurementItem[]  @relation("EquipmentItems")
+  equipmentReceipts EquipmentReceipt[]
+
+  @@map("equipment")
+}
+
+// ============================================================
+// SL_05/06: Unified Procurement System
+// ============================================================
+
+/// Procurement request (FR-RM-05 through FR-RM-11, FR-EQ-05 through FR-EQ-11)
+model ProcurementRequest {
+  id              String            @id @default(cuid())
+  requestNumber   String            @unique @default(cuid())
+  type            ProcurementType   // Discriminator: RAW_MATERIAL or EQUIPMENT
+  status          ProcurementStatus @default(PENDING)
+  reason          String            // Why the procurement is needed
+  rejectionNotes  String?           // FR-RM-10 / FR-EQ-10
+  approvedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?         // Soft delete
+
+  // FK: Requester (Staff: Admin/Baker/Decorator)
+  requesterId     String
+  requester       User              @relation("ProcurementRequester", fields: [requesterId], references: [id])
+
+  // FK: Approver (Owner — nullable until resolved)
+  approverId      String?
+  approver        User?             @relation("ProcurementApprover", fields: [approverId], references: [id])
+
+  // --- Relations ---
+  items           ProcurementItem[]
+  materialReceipts  MaterialReceipt[]
+  equipmentReceipts EquipmentReceipt[]
+
+  @@index([type])
+  @@index([status])
+  @@index([requesterId])
+  @@map("procurement_requests")
+}
+
+/// Procurement line item (per request)
+model ProcurementItem {
+  id              String   @id @default(cuid())
+  quantity        Float    // Requested quantity
+  notes           String?
+  createdAt       DateTime @default(now())
+
+  // FK: Parent procurement request
+  procurementId   String
+  procurement     ProcurementRequest @relation(fields: [procurementId], references: [id], onDelete: Cascade)
+
+  // FK: Either raw material or equipment (one must be set based on procurement type)
+  rawMaterialId   String?
+  rawMaterial     RawMaterial? @relation("RawMaterialItems", fields: [rawMaterialId], references: [id])
+
+  equipmentId     String?
+  equipment       Equipment?   @relation("EquipmentItems", fields: [equipmentId], references: [id])
+
+  @@index([procurementId])
+  @@map("procurement_items")
+}
+
+/// Receipt confirmation for raw materials (FR-RM-12, FR-RM-13)
+model MaterialReceipt {
+  id                  String   @id @default(cuid())
+  receivedQuantity    Float    // Actual quantity received
+  discrepancyNotes    String?  // FR-RM-13: Damaged/missing items
+  receivedAt          DateTime @default(now())
+  createdAt           DateTime @default(now())
+
+  // FK: Parent procurement request
+  procurementId       String
+  procurement         ProcurementRequest @relation(fields: [procurementId], references: [id])
+
+  // FK: Raw material
+  rawMaterialId       String
+  rawMaterial         RawMaterial @relation(fields: [rawMaterialId], references: [id])
+
+  // FK: Confirmed by (Staff)
+  receivedById        String
+  receivedBy          User    @relation(fields: [receivedById], references: [id])
+
+  @@index([procurementId])
+  @@map("material_receipts")
+}
+
+/// Receipt confirmation for equipment (FR-EQ-12, FR-EQ-13)
+model EquipmentReceipt {
+  id                  String             @id @default(cuid())
+  receivedQuantity    Int                // Actual quantity received
+  condition           EquipmentCondition // FR-EQ-13: Condition on arrival
+  conditionNotes      String?            // FR-EQ-13: Condition description
+  receivedAt          DateTime           @default(now())
+  createdAt           DateTime           @default(now())
+
+  // FK: Parent procurement request
+  procurementId       String
+  procurement         ProcurementRequest @relation(fields: [procurementId], references: [id])
+
+  // FK: Equipment
+  equipmentId         String
+  equipment           Equipment @relation(fields: [equipmentId], references: [id])
+
+  // FK: Confirmed by (Staff)
+  receivedById        String
+  receivedBy          User    @relation(fields: [receivedById], references: [id])
+
+  @@index([procurementId])
+  @@map("equipment_receipts")
+}
+
+// ============================================================
+// Cross-Cutting: Notifications & Audit
+// ============================================================
+
+/// In-app notification system (FR-SYS-03)
+model Notification {
+  id          String           @id @default(cuid())
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean          @default(false)
+  metadata    Json?            // Flexible payload (e.g., orderId, leaveRequestId)
+  createdAt   DateTime         @default(now())
+
+  // FK: Recipient user
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+/// Audit log for all critical mutations (FR-SYS-04)
+model AuditLog {
+  id          String   @id @default(cuid())
+  action      String   // e.g., "ORDER_VERIFIED", "LEAVE_APPROVED", "STOCK_UPDATED"
+  entity      String   // e.g., "Order", "LeaveRequest", "RawMaterial"
+  entityId    String   // ID of the affected record
+  oldValue    Json?    // Previous state snapshot
+  newValue    Json?    // New state snapshot
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  // FK: User who performed the action
+  performedById String
+  performedBy   User   @relation(fields: [performedById], references: [id])
+
+  @@index([entity, entityId])
+  @@index([performedById])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
