@@ -5,11 +5,11 @@
 **Sistem Operasional Terintegrasi (ERP & POS) untuk Toko Roti**
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-Frontend-black?style=flat-square&logo=next.js" alt="Next.js" />
-  <img src="https://img.shields.io/badge/Elysia.js-Backend-blueviolet?style=flat-square" alt="Elysia" />
-  <img src="https://img.shields.io/badge/Prisma-ORM-1B222D?style=flat-square&logo=prisma" alt="Prisma" />
-  <img src="https://img.shields.io/badge/PostgreSQL-Database-336791?style=flat-square&logo=postgresql" alt="PostgreSQL" />
-  <img src="https://img.shields.io/badge/TailwindCSS-UI-38B2AC?style=flat-square&logo=tailwind-css" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/Next.js-Frontend-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Elysia.js-Backend-blueviolet?style=for-the-badge" alt="Elysia" />
+  <img src="https://img.shields.io/badge/Prisma-ORM-1B222D?style=for-the-badge&logo=prisma" alt="Prisma" />
+  <img src="https://img.shields.io/badge/PostgreSQL-Database-336791?style=for-the-badge&logo=postgresql" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/TailwindCSS-UI-38B2AC?style=for-the-badge&logo=tailwind-css" alt="Tailwind CSS" />
 </p>
 
 </div>
