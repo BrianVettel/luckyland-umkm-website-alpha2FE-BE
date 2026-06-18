@@ -51,7 +51,7 @@ Proyek ini terdiri dari dua bagian utama: **Backend** (Elysia.js) dan **Frontend
 Buka terminal dan arahkan ke folder backend Anda.
 Pastikan sudah mempunyai postgresql di device anda
 
-**1. Instalasi Dependensi**
+**1. Tahap Installasi Dependensi dan Menjalankan Web**
 ```bash
 cd luckyland-backend
 bun install
