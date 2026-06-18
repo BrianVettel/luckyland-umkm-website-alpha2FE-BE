@@ -49,6 +49,7 @@ Proyek ini terdiri dari dua bagian utama: **Backend** (Elysia.js) dan **Frontend
 
 ### Tahap 1: Setup Backend (Database & API)
 Buka terminal dan arahkan ke folder backend Anda.
+Pastikan sudah mempunyai postgresql di device anda
 
 **1. Instalasi Dependensi**
 ```bash
