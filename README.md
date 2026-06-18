@@ -54,3 +54,32 @@ Buka terminal dan arahkan ke folder backend Anda.
 ```bash
 cd luckyland-backend
 bun install
+
+### Tahap 2: Konfigurasi .env 
+# Koneksi ke database PostgreSQL
+DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/luckyland?schema=public"
+
+# URL Frontend untuk keperluan CORS
+FRONTEND_URL="http://localhost:3000"
+
+# Port Server Backend
+PORT=3001
+
+# Rahasia JWT & API Pihak Ketiga
+JWT_SECRET="rahasia_super_aman_anda"
+FONNTE_TOKEN="token_api_whatsapp_anda"
+
+### Tahap 3: Migrasi, Seeding Database dan Menjalankan server backend 
+# Jalankan perintah dibawah ini:
+bunx prisma db push
+bunx prisma db seed
+bun run dev
+
+### Tahap 4: Setup Frontend dan Jalankan server frontend 
+#Buka terminal baru (biarkan terminal backend tetap berjalan), dan arahkan ke folder frontend.
+1. Instalasi Dependensi
+cd luckyland-main
+npm install
+2. Jalankan server
+npm run dev
+
