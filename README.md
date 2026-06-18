@@ -77,7 +77,7 @@ bun run dev
 
 ### Tahap 4: Setup Frontend dan Jalankan server frontend 
 #Buka terminal baru (biarkan terminal backend tetap berjalan), dan arahkan ke folder frontend.
-1. Instalasi Dependensi
+1. Instalasi Dependensi dan Database
 cd luckyland-main
 npm install
 2. Jalankan server
