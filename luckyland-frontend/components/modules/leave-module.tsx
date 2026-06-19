@@ -185,11 +185,13 @@ function RejectLeaveDialog({ id, onReject }: { id: string, onReject: (note: stri
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="icon" variant="outline" className="size-7 text-destructive">
-          <X className="size-4" />
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button size="icon" variant="outline" className="size-7 text-destructive">
+            <X className="size-4" />
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Tolak Pengajuan Cuti</DialogTitle>

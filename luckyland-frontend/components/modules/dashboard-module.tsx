@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import {
   Bar,
   BarChart,
@@ -40,17 +40,34 @@ import { rupiah } from "@/lib/format"
 import { useStore } from "@/lib/store"
 
 export function DashboardModule() {
-  const { orders, leaveRequests, materials, payroll } = useStore()
+  const { 
+    orders, 
+    leaveRequests, 
+    materials, 
+    payroll, 
+    fetchOrders, 
+    fetchLeaveRequests, 
+    fetchMaterials, 
+    fetchPayroll 
+  } = useStore()
+
+  useEffect(() => {
+    fetchOrders()
+    fetchLeaveRequests()
+    fetchMaterials()
+    fetchPayroll()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const stats = useMemo(() => {
-    const active = orders.filter((o) => o.orderStatus !== "cancelled")
+    const active = orders.filter((o) => o.status !== "CANCELLED" && o.orderStatus !== "cancelled")
     const revenue = active
-      .filter((o) => o.paymentStatus === "lunas")
-      .reduce((s, o) => s + o.total, 0)
-    const inProduction = active.filter(
-      (o) => !["finished", "pending"].includes(o.productionStatus),
-    ).length
-    const pendingLeave = leaveRequests.filter((r) => r.status === "pending").length
+      .filter((o) => o.paymentStatus === "LUNAS" || o.paymentStatus === "lunas")
+      .reduce((s, o) => s + (o.totalAmount || o.total || 0), 0)
+    const inProduction = active.filter((o) => {
+      const prodStatus = o.productionTask?.status || o.productionStatus
+      return prodStatus && !["FINISHED", "finished", "PENDING", "pending"].includes(prodStatus)
+    }).length
+    const pendingLeave = leaveRequests.filter((r) => r.status === "PENDING" || r.status === "pending").length
     const lowStock = materials.filter((m) => m.stock <= m.minStock).length
     const payrollTotal = payroll.reduce((s, p) => s + p.net, 0)
     return {
@@ -66,11 +83,13 @@ export function DashboardModule() {
   const topProducts = useMemo(() => {
     const map = new Map<string, number>()
     orders
-      .filter((o) => o.orderStatus !== "cancelled")
+      .filter((o) => o.status !== "CANCELLED" && o.orderStatus !== "cancelled")
       .forEach((o) =>
-        (o.items || []).forEach((it: any) =>
-          map.set(it.name, (map.get(it.name) ?? 0) + it.qty),
-        ),
+        (o.items || []).forEach((it: any) => {
+          const name = it.product?.name || it.name
+          const qty = it.quantity || it.qty || 0
+          if (name) map.set(name, (map.get(name) ?? 0) + qty)
+        }),
       )
     return [...map.entries()]
       .map(([name, qty]) => ({ name, qty }))
@@ -79,8 +98,8 @@ export function DashboardModule() {
   }, [orders])
 
   const channelMix = useMemo(() => {
-    const online = orders.filter((o) => o.channel === "online").length
-    const offline = orders.filter((o) => o.channel === "offline").length
+    const online = orders.filter((o) => o.origin === "ONLINE" || o.channel === "online").length
+    const offline = orders.filter((o) => o.origin === "OFFLINE" || o.channel === "offline").length
     return [
       { name: "Online", value: online, fill: "var(--color-chart-1)" },
       { name: "Offline", value: offline, fill: "var(--color-chart-2)" },

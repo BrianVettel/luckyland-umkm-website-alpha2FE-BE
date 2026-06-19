@@ -378,6 +378,7 @@ model PayrollDetail {
   transferStatus        TransferStatus @default(PENDING) // FR-PAY-10
   transferReceiptUrl    String?        // FR-PAY-11: Upload proof
   payslipUrl            String?        // FR-PAY-12: Generated PDF
+  transferProof         String?        // Upload bukti transfer (image/PDF)
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
 

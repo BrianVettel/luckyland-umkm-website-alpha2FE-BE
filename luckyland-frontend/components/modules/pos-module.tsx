@@ -205,7 +205,7 @@ function NewOrderDialog() {
             key={selectKey}
             onValueChange={(val) => { 
               if (val) {
-                addProduct(val)
+                addProduct(val as string)
                 setSelectKey(k => k + 1)
               }
             }}

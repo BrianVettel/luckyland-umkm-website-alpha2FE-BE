@@ -63,8 +63,8 @@ interface StoreValue {
   fetchProductionTasks: () => Promise<void>
   createOrder: (o: any) => Promise<void>
   verifyOrder: (id: string) => Promise<void>
-  cancelOrder: (id: string) => void
-  setPaymentStatus: (id: string, status: PaymentStatus) => void
+  cancelOrder: (id: string) => Promise<void>
+  setPaymentStatus: (id: string, status: PaymentStatus) => Promise<void>
   setProductionStatus: (id: string, status: ProductionStatus) => Promise<void>
   leaveRequests: LeaveRequest[]
   fetchLeaveRequests: () => Promise<void>
@@ -74,6 +74,7 @@ interface StoreValue {
   payroll: PayrollRecord[]
   fetchPayroll: () => Promise<void>
   runPayroll: (month: string) => Promise<void>
+  uploadTransferProof: (id: string, file: File) => Promise<{ whatsappUrl?: string }>
   decidePayroll: (id: string, status: string) => Promise<void>
   materials: Material[]
   fetchMaterials: () => Promise<void>
@@ -271,9 +272,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (res.success) setPayroll(res.data)
       },
       runPayroll: async (month) => {
+        // Parse "2026-06" into { month: 6, year: 2026 }
+        const [yearStr, monthStr] = month.split("-")
+        const monthNum = parseInt(monthStr, 10)
+        const yearNum = parseInt(yearStr, 10)
         const res = await apiFetch("/payroll/calculate", {
           method: "POST",
-          data: { month },
+          data: { month: monthNum, year: yearNum },
         })
         if (res.success) {
           const fresh = await apiFetch("/payroll/")
@@ -281,6 +286,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } else {
           throw new Error(res.message || "Gagal memproses penggajian")
         }
+      },
+      uploadTransferProof: async (id, file) => {
+        const formData = new FormData()
+        formData.append("file", file)
+        
+        const token = typeof window !== "undefined" ? localStorage.getItem("lucky_token") : null
+        const headers: Record<string, string> = {}
+        if (token) headers["Authorization"] = `Bearer ${token}`
+        
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api"}/payroll/${id}/pay`, {
+          method: "PATCH",
+          headers,
+          body: formData,
+        })
+        const json = await res.json()
+        if (!res.ok || !json.success) {
+          throw new Error(json.message || "Gagal mengupload bukti transfer")
+        }
+        // Refresh payroll data
+        const fresh = await apiFetch("/payroll/")
+        if (fresh.success) setPayroll(fresh.data)
+        
+        return { whatsappUrl: json.whatsappUrl }
       },
       decidePayroll: async (id, status) => {
         if (status === "PAID" || status === "paid") {

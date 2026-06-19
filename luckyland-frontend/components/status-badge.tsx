@@ -28,6 +28,7 @@ const LABELS: Record<string, { label: string; tone: Tone }> = {
   // requests
   approved: { label: "Approved", tone: "success" },
   rejected: { label: "Rejected", tone: "danger" },
+  calculated: { label: "Dihitung", tone: "info" },
   paid: { label: "Paid", tone: "success" },
   // stock
   available: { label: "Tersedia", tone: "success" },

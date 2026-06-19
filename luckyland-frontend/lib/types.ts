@@ -56,11 +56,12 @@ export interface Order {
   orderStatus?: string
   status?: string
   productionStatus?: string
+  productionTask?: { status: string }
   createdBy?: string
 }
 
 export type LeaveType = "annual" | "sick" | "personal"
-export type RequestStatus = "pending" | "approved" | "rejected"
+export type RequestStatus = "pending" | "approved" | "rejected" | "PENDING" | "APPROVED" | "REJECTED"
 
 export interface ProductionTask {
   id: string
@@ -101,19 +102,23 @@ export interface Employee {
   absentDays: number
 }
 
-export type PayrollStatus = "draft" | "verified" | "paid"
+export type PayrollStatus = "draft" | "calculated" | "verified" | "paid"
 
 export interface PayrollRecord {
   id: string
+  periodId: string
   employeeId: string
   employeeName: string
   role: Role
+  phone: string
   month: string
   basicSalary: number
   absenceDeduction: number
   leaveDeduction: number
   net: number
   status: PayrollStatus
+  transferProof?: string | null
+  transferStatus?: string
 }
 
 export type StockStatus = "available" | "low" | "out"

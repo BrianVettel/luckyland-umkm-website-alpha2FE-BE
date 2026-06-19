@@ -117,7 +117,9 @@ export const posRoutes = new Elysia({ prefix: "/api/pos" })
         where: filter,
         orderBy: { orderDate: "desc" },
         include: {
-          _count: { select: { items: true } },
+          items: {
+            include: { product: { select: { name: true } } }
+          },
           productionTask: { select: { status: true } }
         }
       });
