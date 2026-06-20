@@ -31,7 +31,7 @@ const app = new Elysia()
       set.status = 400;
       return {
         success: false,
-        message: "Validation error",
+        message: `Validation error: ${JSON.stringify(error.all)}`,
         errors: error.all,
       };
     }

@@ -278,7 +278,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const yearNum = parseInt(yearStr, 10)
         const res = await apiFetch("/payroll/calculate", {
           method: "POST",
-          data: { month: monthNum, year: yearNum },
+          data: { month: monthNum, year: yearNum, notes: "" },
         })
         if (res.success) {
           const fresh = await apiFetch("/payroll/")

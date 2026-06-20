@@ -51,6 +51,16 @@ async function main() {
       basicSalary: 4200000,
       leaveQuota: 12,
     },
+    {
+      username: "decorator",
+      password: "decorator123",
+      name: "Sinta",
+      role: "DECORATOR" as const,
+      email: "sinta@luckyland.com",
+      phone: "08123456005",
+      basicSalary: 4000000,
+      leaveQuota: 12,
+    },
   ];
 
   for (const userData of users) {
