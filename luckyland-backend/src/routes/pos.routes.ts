@@ -27,7 +27,11 @@ export const posRoutes = new Elysia({ prefix: "/api/pos" })
   .post(
     "/orders",
     async ({ user, body, set }) => {
-      const { customerName, origin, orderDate, notes, items } = body;
+      if (user!.role === "ADMIN") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: ADMIN is read-only" };
+      }
+      const { customerName, origin, orderDate, notes, items, isDirectPurchase, customPrice } = body;
 
       // Ensure the transaction handles price fetching and order creation atomically
       const result = await prisma.$transaction(async (tx) => {
@@ -58,21 +62,46 @@ export const posRoutes = new Elysia({ prefix: "/api/pos" })
           });
         }
 
+        if (customPrice !== undefined && customPrice !== null) {
+          totalAmount = customPrice;
+        }
+
+        const orderData: any = {
+          customerName,
+          origin: origin as OrderOrigin,
+          orderDate: new Date(orderDate),
+          notes,
+          totalAmount,
+          isDirectPurchase: isDirectPurchase || false,
+          customPrice: customPrice || null,
+          createdById: user!.id,
+          items: {
+            create: processedItems
+          }
+        };
+
+        if (isDirectPurchase) {
+          orderData.status = "SELESAI";
+          orderData.paymentStatus = "LUNAS";
+        }
+
         // Create the order
         const order = await tx.order.create({
-          data: {
-            customerName,
-            origin: origin as OrderOrigin,
-            orderDate: new Date(orderDate),
-            notes,
-            totalAmount,
-            createdById: user!.id,
-            items: {
-              create: processedItems
-            }
-          },
+          data: orderData,
           include: { items: true }
         });
+
+        if (isDirectPurchase) {
+          await tx.productionTask.create({
+            data: {
+              orderId: order.id,
+              status: "FINISHED",
+              deadline: new Date(orderDate),
+              startedAt: new Date(),
+              completedAt: new Date()
+            }
+          });
+        }
 
         return order;
       });
@@ -89,6 +118,8 @@ export const posRoutes = new Elysia({ prefix: "/api/pos" })
         origin: t.Enum(OrderOrigin),
         orderDate: t.String({ format: "date-time" }), // Represents the requested delivery/pickup date
         notes: t.Optional(t.String()),
+        isDirectPurchase: t.Optional(t.Boolean()),
+        customPrice: t.Optional(t.Number()),
         items: t.Array(t.Object({
           productId: t.String(),
           quantity: t.Number({ minimum: 1 }),
@@ -169,7 +200,11 @@ export const posRoutes = new Elysia({ prefix: "/api/pos" })
   // ──────────────────────────────────────────────
   .put(
     "/orders/:id/status",
-    async ({ params: { id }, body, set }) => {
+    async ({ params: { id }, body, user, set }) => {
+      if (user!.role === "ADMIN") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: ADMIN is read-only" };
+      }
       const { status, paymentStatus } = body;
 
       const order = await prisma.order.findUnique({
@@ -228,7 +263,11 @@ export const posRoutes = new Elysia({ prefix: "/api/pos" })
   // ──────────────────────────────────────────────
   .delete(
     "/orders/:id",
-    async ({ params: { id }, set }) => {
+    async ({ params: { id }, user, set }) => {
+      if (user!.role === "ADMIN") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: ADMIN is read-only" };
+      }
       const order = await prisma.order.findUnique({
         where: { id }
       });

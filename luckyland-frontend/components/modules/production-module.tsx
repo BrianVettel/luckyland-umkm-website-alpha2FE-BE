@@ -14,6 +14,12 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { StatCard } from "@/components/ui-bits";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { shortDate } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import type { ProductionStatus, Role } from "@/lib/types";
@@ -32,8 +38,9 @@ function nextActions(
   status: ProductionStatus,
   role: Role,
 ): { label: string; to: ProductionStatus }[] {
-  const isBaker = role === "baker" || role === "owner" || role === "admin";
-  const isDeco = role === "decorator" || role === "owner" || role === "admin";
+  if (role === "admin" || role === "kasir") return [];
+  const isBaker = role === "baker" || role === "owner";
+  const isDeco = role === "decorator" || role === "owner";
   const out: { label: string; to: ProductionStatus }[] = [];
   if (status === "pending" && isBaker)
     out.push({ label: "Mulai", to: "in_progress" });
@@ -132,13 +139,145 @@ function ProductionCard({ task }: { task: any }) {
   );
 }
 
+function DailyProductionTab() {
+  const { dailyProduction, createDailyProduction, updateDailyProduction, deleteDailyProduction, user } = useStore();
+  const isOwner = user?.role === "owner";
+  const isReadOnly = user?.role === "admin" || user?.role === "kasir";
+  const canUpdate = user?.role === "baker" || user?.role === "decorator" || user?.role === "owner";
+  
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [targetQty, setTargetQty] = useState("");
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createDailyProduction({
+        name,
+        targetQty: parseInt(targetQty),
+        date: new Date().toISOString(),
+        status: "PENDING"
+      });
+      toast.success("Produksi harian ditambahkan");
+      setOpen(false);
+      setName("");
+      setTargetQty("");
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium">Data Produksi Harian</h3>
+        {isOwner && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={<Button />}>
+              Tambah Produksi
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Tambah Produksi Harian</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nama Produk</Label>
+                  <Input required value={name} onChange={e => setName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Target Qty</Label>
+                  <Input type="number" required value={targetQty} onChange={e => setTargetQty(e.target.value)} />
+                </div>
+                <Button type="submit" className="w-full">Simpan</Button>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
+      </div>
+
+      <div className="rounded-md border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nama</TableHead>
+              <TableHead>Target</TableHead>
+              <TableHead>Current</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Tanggal</TableHead>
+              {isOwner && <TableHead>Aksi</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {dailyProduction.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell>{item.name}</TableCell>
+                <TableCell>{item.targetQty}</TableCell>
+                <TableCell>
+                  {canUpdate ? (
+                    <Input 
+                      type="number" 
+                      className="w-20 h-8"
+                      defaultValue={item.currentQty} 
+                      onBlur={(e) => updateDailyProduction(item.id, { currentQty: parseInt(e.target.value) })}
+                    />
+                  ) : (
+                    item.currentQty
+                  )}
+                </TableCell>
+                <TableCell>
+                  {canUpdate ? (
+                    <Select
+                      defaultValue={item.status}
+                      onValueChange={(val) => updateDailyProduction(item.id, { status: val })}
+                    >
+                      <SelectTrigger className="w-32 h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PENDING">Pending</SelectItem>
+                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                        <SelectItem value="FINISHED">Finished</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <StatusBadge status={item.status.toLowerCase() as any} />
+                  )}
+                </TableCell>
+                <TableCell>{shortDate(item.date)}</TableCell>
+                {isOwner && (
+                  <TableCell>
+                    <Button variant="destructive" size="sm" onClick={() => {
+                      if (confirm("Hapus produksi harian ini?")) {
+                        deleteDailyProduction(item.id).then(() => toast.success("Berhasil dihapus")).catch(e => toast.error(e.message))
+                      }
+                    }}>Hapus</Button>
+                  </TableCell>
+                )}
+              </TableRow>
+            ))}
+            {dailyProduction.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground h-24">Belum ada data.</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
 export function ProductionModule() {
-  const { productionTasks, fetchProductionTasks, user } = useStore();
+  const { productionTasks, fetchProductionTasks, fetchDailyProduction, user } = useStore();
   const [loading, setLoading] = useState(true);
   const isOwner = user?.role === "owner";
 
   useEffect(() => {
-    fetchProductionTasks().finally(() => setLoading(false));
+    Promise.all([
+      fetchProductionTasks(),
+      fetchDailyProduction()
+    ]).finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tasks = useMemo(
@@ -169,8 +308,14 @@ export function ProductionModule() {
   }, [tasks]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <Tabs defaultValue="khusus" className="space-y-5">
+      <TabsList>
+        <TabsTrigger value="khusus">Produksi Pesanan Khusus</TabsTrigger>
+        <TabsTrigger value="harian">Produksi Harian</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="khusus" className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {COLUMNS.map((col) => (
             <StatCard
@@ -248,6 +393,11 @@ export function ProductionModule() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </TabsContent>
+
+      <TabsContent value="harian">
+        <DailyProductionTab />
+      </TabsContent>
+    </Tabs>
   );
 }

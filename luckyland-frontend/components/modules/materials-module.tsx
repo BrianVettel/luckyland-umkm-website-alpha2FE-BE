@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { PackagePlus, Search } from "lucide-react"
+import { PackagePlus, Search, Pencil } from "lucide-react"
 import { useStore } from "@/lib/store"
 import { StatusBadge } from "@/components/status-badge"
 import {
@@ -63,9 +63,12 @@ export function MaterialsModule() {
     receiveProcurement,
     fetchMaterials,
     fetchProcurement,
+    setMaterialStock,
   } = useStore()
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
+  const [editStockId, setEditStockId] = useState<string | null>(null)
+  const [editStockValue, setEditStockValue] = useState("")
   const [form, setForm] = useState({ itemName: "", qty: 1, unit: "kg" })
   const [loading, setLoading] = useState(true)
 
@@ -270,7 +273,42 @@ export function MaterialsModule() {
                         {m.category}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {m.stock} {m.unit}
+                        <div className="flex items-center justify-end gap-2">
+                          <span>{m.stock} {m.unit}</span>
+                          <Dialog open={editStockId === m.id} onOpenChange={(o) => {
+                            if (o) {
+                              setEditStockId(m.id)
+                              setEditStockValue(m.stock.toString())
+                            } else {
+                              setEditStockId(null)
+                            }
+                          }}>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6">
+                                <Pencil className="size-3" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Hitung Fisik: {m.name}</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4 py-2">
+                                <Label>Stok Aktual ({m.unit})</Label>
+                                <Input type="number" value={editStockValue} onChange={e => setEditStockValue(e.target.value)} />
+                              </div>
+                              <DialogFooter>
+                                <Button onClick={() => {
+                                  toast.promise(setMaterialStock(m.id, Number(editStockValue)), {
+                                    loading: "Menyimpan...",
+                                    success: "Stok diperbarui",
+                                    error: "Gagal memperbarui stok"
+                                  });
+                                  setEditStockId(null);
+                                }}>Simpan Stok</Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
                         {m.minStock} {m.unit}

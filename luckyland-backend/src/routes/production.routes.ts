@@ -81,11 +81,15 @@ export const productionRoutes = new Elysia({ prefix: "/api/production" })
   )
 
   // ──────────────────────────────────────────────
-  // PUT /api/production/tasks/:id/status — Update task progress
+  // PATCH /api/production/tasks/:id/status — Update task progress
   // ──────────────────────────────────────────────
-  .put(
+  .patch(
     "/tasks/:id/status",
     async ({ params: { id }, body, user, set }) => {
+      if (user!.role !== "BAKER" && user!.role !== "DECORATOR") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: Only BAKER and DECORATOR can update task status" };
+      }
       const { status, notes } = body;
 
       const task = await prisma.productionTask.findUnique({
@@ -134,5 +138,83 @@ export const productionRoutes = new Elysia({ prefix: "/api/production" })
         notes: t.Optional(t.String())
       }),
       detail: { tags: ["Production"] }
+    }
+  )
+
+  // ──────────────────────────────────────────────
+  // DAILY PRODUCTION CRUD
+  // ──────────────────────────────────────────────
+  .get(
+    "/daily",
+    async () => {
+      const daily = await prisma.dailyProduction.findMany({
+        orderBy: { date: "desc" }
+      });
+      return { success: true, data: daily };
+    }
+  )
+  .post(
+    "/daily",
+    async ({ user, body, set }) => {
+      if (user!.role !== "OWNER") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: Only OWNER can create daily production" };
+      }
+      const { name, targetQty, date, status } = body;
+      const daily = await prisma.dailyProduction.create({
+        data: {
+          name,
+          targetQty,
+          date: new Date(date),
+          status: status || "PENDING"
+        }
+      });
+      return { success: true, data: daily };
+    },
+    {
+      body: t.Object({
+        name: t.String(),
+        targetQty: t.Number(),
+        date: t.String({ format: "date-time" }),
+        status: t.Optional(t.String())
+      }),
+      detail: { tags: ["Production"] }
+    }
+  )
+  .patch(
+    "/daily/:id",
+    async ({ params: { id }, user, body, set }) => {
+      if (user!.role !== "BAKER" && user!.role !== "DECORATOR") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: Only BAKER and DECORATOR can update daily production" };
+      }
+      const { currentQty, status } = body;
+      const updateData: any = {};
+      if (currentQty !== undefined) updateData.currentQty = currentQty;
+      if (status !== undefined) updateData.status = status;
+
+      const daily = await prisma.dailyProduction.update({
+        where: { id },
+        data: updateData
+      });
+      return { success: true, data: daily };
+    },
+    {
+      body: t.Object({
+        currentQty: t.Optional(t.Number()),
+        status: t.Optional(t.String())
+      }),
+      detail: { tags: ["Production"] }
+    }
+  )
+  .delete(
+    "/daily/:id",
+    async ({ params: { id }, user, set }) => {
+      if (user!.role !== "OWNER") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: Only OWNER can delete daily production" };
+      }
+      await prisma.dailyProduction.delete({ where: { id } });
+      return { success: true, message: "Deleted successfully" };
     }
   );

@@ -66,12 +66,14 @@ function NewOrderDialog() {
   const [customer, setCustomer] = useState("")
   const [cart, setCart] = useState<OrderItem[]>([])
   const [deadline, setDeadline] = useState(new Date().toISOString().slice(0, 10))
+  const [isDirectPurchase, setIsDirectPurchase] = useState(false)
+  const [customPrice, setCustomPrice] = useState("")
   const [size, setSize] = useState("")
   const [theme, setTheme] = useState("")
   const [notes, setNotes] = useState("")
   const [selectKey, setSelectKey] = useState(0)
 
-  const total = cart.reduce((s, it) => s + it.price * it.qty, 0)
+  const total = customPrice ? parseInt(customPrice) : cart.reduce((s, it) => s + it.price * it.qty, 0)
 
   function addProduct(id: string) {
     const p = products.find((x) => x.id === id)
@@ -102,6 +104,8 @@ function NewOrderDialog() {
     setSize("")
     setTheme("")
     setNotes("")
+    setCustomPrice("")
+    setIsDirectPurchase(false)
     setChannel("offline")
   }
 
@@ -114,8 +118,10 @@ function NewOrderDialog() {
       await createOrder({
         origin: channel.toUpperCase(),
         customerName: customer,
-        orderDate: new Date(deadline).toISOString(),
+        orderDate: isDirectPurchase ? new Date().toISOString() : new Date(deadline).toISOString(),
         notes: notes || undefined,
+        isDirectPurchase,
+        customPrice: customPrice ? parseInt(customPrice) : undefined,
         items: cart.map(it => ({
           productId: it.productId,
           quantity: it.qty,
@@ -166,15 +172,27 @@ function NewOrderDialog() {
               placeholder="cth. Dewi Anjani"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="dl">Deadline / Tanggal Ambil</Label>
-            <Input
-              id="dl"
-              type="date"
-              value={deadline}
-              onChange={(e) => setDeadline(e.target.value)}
+          <div className="flex items-center gap-2 pt-6">
+            <input 
+              type="checkbox" 
+              id="direct" 
+              className="size-4"
+              checked={isDirectPurchase} 
+              onChange={e => setIsDirectPurchase(e.target.checked)} 
             />
+            <Label htmlFor="direct">Pemesanan Langsung (Ready Stock)</Label>
           </div>
+          {!isDirectPurchase && (
+            <div className="space-y-2">
+              <Label htmlFor="dl">Deadline / Tanggal Ambil</Label>
+              <Input
+                id="dl"
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+            </div>
+          )}
           {channel === "online" && (
             <>
               <div className="space-y-2">
@@ -279,6 +297,17 @@ function NewOrderDialog() {
             onChange={(e) => setNotes(e.target.value)}
             placeholder="cth. Tulisan di kue, alergi, instruksi pengiriman"
             rows={2}
+          />
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <Label htmlFor="customPrice">Harga Custom (Opsional)</Label>
+          <Input
+            id="customPrice"
+            type="number"
+            value={customPrice}
+            onChange={(e) => setCustomPrice(e.target.value)}
+            placeholder="Masukkan jika menggunakan harga custom"
           />
         </div>
 

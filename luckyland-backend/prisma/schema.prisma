@@ -218,6 +218,8 @@ model Order {
   notes          String?       // FR-POS-02: Additional notes
   totalAmount    Float         @default(0) // FR-POS-03: Auto-calculated
   receiptUrl     String?       // FR-POS-10: Receipt file path
+  isDirectPurchase Boolean     @default(false)
+  customPrice    Int?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   deletedAt      DateTime?     // Soft delete
@@ -286,6 +288,20 @@ model ProductionTask {
   @@index([deadline])
   @@index([assignedToId])
   @@map("production_tasks")
+}
+
+/// Daily Production Tracking
+model DailyProduction {
+  id          String   @id @default(cuid())
+  name        String
+  targetQty   Int
+  currentQty  Int      @default(0)
+  status      String
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("daily_productions")
 }
 
 // ============================================================
@@ -432,6 +448,7 @@ model Equipment {
   condition       EquipmentCondition @default(GOOD) // FR-EQ-01
   description     String?
   isActive        Boolean            @default(true)
+  jumlahUnit      Int                @default(1)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   deletedAt       DateTime?          // Soft delete (FR-EQ-03)

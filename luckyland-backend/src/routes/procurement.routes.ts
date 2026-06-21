@@ -28,6 +28,27 @@ export const procurementRoutes = new Elysia({ prefix: "/api/procurement" })
   )
 
   // ──────────────────────────────────────────────
+  // PATCH /api/procurement/materials/:id/stock — Edit Manual Stok Fisik
+  // ──────────────────────────────────────────────
+  .patch(
+    "/materials/:id/stock",
+    async ({ params: { id }, body, set }) => {
+      const { stock } = body;
+      const material = await prisma.rawMaterial.update({
+        where: { id },
+        data: { currentStock: stock }
+      });
+      return { success: true, data: material };
+    },
+    {
+      body: t.Object({
+        stock: t.Number()
+      }),
+      detail: { tags: ["Procurement"] }
+    }
+  )
+
+  // ──────────────────────────────────────────────
   // GET /api/procurement/equipment — List all equipment
   // ──────────────────────────────────────────────
   .get(
@@ -228,12 +249,16 @@ export const procurementRoutes = new Elysia({ prefix: "/api/procurement" })
   )
 
   // ──────────────────────────────────────────────
-  // PUT /api/procurement/:id/approve — Owner Approval
+  // PATCH /api/procurement/:id/approve — Owner Approval
   // ──────────────────────────────────────────────
   .use(createRoleGuard(["OWNER"]))
-  .put(
+  .patch(
     "/:id/approve",
     async ({ params: { id }, body, user, set }) => {
+      if (user!.role !== "OWNER") {
+        set.status = 403;
+        return { success: false, message: "Forbidden: Only OWNER can approve procurement" };
+      }
       const { status, rejectionNotes } = body;
 
       const procurement = await prisma.procurementRequest.findUnique({

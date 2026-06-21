@@ -58,9 +58,14 @@ interface StoreValue {
   products: Product[]
   orders: Order[]
   productionTasks: ProductionTask[]
+  dailyProduction: any[]
   fetchProducts: () => Promise<void>
   fetchOrders: () => Promise<void>
   fetchProductionTasks: () => Promise<void>
+  fetchDailyProduction: () => Promise<void>
+  createDailyProduction: (data: any) => Promise<void>
+  updateDailyProduction: (id: string, data: any) => Promise<void>
+  deleteDailyProduction: (id: string) => Promise<void>
   createOrder: (o: any) => Promise<void>
   verifyOrder: (id: string) => Promise<void>
   cancelOrder: (id: string) => Promise<void>
@@ -78,6 +83,7 @@ interface StoreValue {
   decidePayroll: (id: string, status: string) => Promise<void>
   materials: Material[]
   fetchMaterials: () => Promise<void>
+  setMaterialStock: (id: string, stock: number) => Promise<void>
   procurement: ProcurementRequest[]
   fetchProcurement: () => Promise<void>
   requestProcurement: (r: any) => Promise<void>
@@ -94,6 +100,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [productionTasks, setProductionTasks] = useState<ProductionTask[]>([])
+  const [dailyProduction, setDailyProduction] = useState<any[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([])
   const [payroll, setPayroll] = useState<PayrollRecord[]>([])
@@ -143,6 +150,49 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           }
         } catch (error) {
           console.error("Failed to fetch production tasks:", error)
+        }
+      },
+      dailyProduction,
+      fetchDailyProduction: async () => {
+        try {
+          const res = await apiFetch("/production/daily")
+          if (res.success) {
+            setDailyProduction(res.data)
+          }
+        } catch (error) {
+          console.error("Failed to fetch daily production:", error)
+        }
+      },
+      createDailyProduction: async (data) => {
+        const res = await apiFetch("/production/daily", {
+          method: "POST",
+          data,
+        })
+        if (res.success) {
+          await value.fetchDailyProduction()
+        } else {
+          throw new Error(res.message || "Gagal membuat produksi harian")
+        }
+      },
+      updateDailyProduction: async (id, data) => {
+        const res = await apiFetch(`/production/daily/${id}`, {
+          method: "PATCH",
+          data,
+        })
+        if (res.success) {
+          await value.fetchDailyProduction()
+        } else {
+          throw new Error(res.message || "Gagal memperbarui produksi harian")
+        }
+      },
+      deleteDailyProduction: async (id) => {
+        const res = await apiFetch(`/production/daily/${id}`, {
+          method: "DELETE",
+        })
+        if (res.success) {
+          await value.fetchDailyProduction()
+        } else {
+          throw new Error(res.message || "Gagal menghapus produksi harian")
         }
       },
       createOrder: async (o) => {
@@ -338,6 +388,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           setMaterials(mapped)
         }
       },
+      setMaterialStock: async (id, stock) => {
+        const res = await apiFetch(`/procurement/materials/${id}/stock`, {
+          method: "PATCH",
+          data: { stock },
+        })
+        if (res.success) {
+          await value.fetchMaterials()
+        } else {
+          throw new Error(res.message || "Gagal memperbarui stok fisik")
+        }
+      },
       procurement,
       fetchProcurement: async () => {
         const res = await apiFetch("/procurement/")
@@ -430,7 +491,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ),
         ),
     }
-  }, [user, orders, productionTasks, products, leaveRequests, payroll, employees, materials, procurement, equipment])
+  }, [user, orders, productionTasks, dailyProduction, products, leaveRequests, payroll, employees, materials, procurement, equipment])
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
 }
