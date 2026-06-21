@@ -76,6 +76,7 @@ interface StoreValue {
   submitLeave: (r: any) => Promise<void>
   decideLeave: (id: string, status: string, note?: string) => Promise<void>
   employees: Employee[]
+  fetchEmployees: () => Promise<void>
   payroll: PayrollRecord[]
   fetchPayroll: () => Promise<void>
   runPayroll: (month: string) => Promise<void>
@@ -316,6 +317,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       },
       employees,
+      fetchEmployees: async () => {
+        const res = await apiFetch("/payroll/employees")
+        if (res.success) {
+          setEmployees(res.data)
+        }
+      },
       payroll,
       fetchPayroll: async () => {
         const res = await apiFetch("/payroll/")

@@ -201,6 +201,7 @@ export function PayrollModule() {
     employees,
     payroll,
     fetchPayroll,
+    fetchEmployees,
     runPayroll,
   } = useStore()
   const [month, setMonth] = useState("2026-06")
@@ -208,7 +209,10 @@ export function PayrollModule() {
   const [payrollError, setPayrollError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchPayroll().finally(() => setLoading(false))
+    Promise.all([
+      fetchPayroll(),
+      fetchEmployees(),
+    ]).finally(() => setLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const total = payroll.reduce((s, p) => s + p.net, 0)

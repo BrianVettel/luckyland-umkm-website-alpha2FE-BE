@@ -169,6 +169,36 @@ export const payrollRoutes = new Elysia({ prefix: "/api/payroll" })
   )
 
   // ──────────────────────────────────────────────
+  // GET /api/payroll/employees — List all employees for Data Master Karyawan
+  // ──────────────────────────────────────────────
+  .get(
+    "/employees",
+    async () => {
+      const employees = await prisma.user.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          role: true,
+          basicSalary: true,
+          bankAccount: true,
+          phone: true,
+        }
+      });
+      // Map 'phone' to 'whatsapp' to match frontend Employee interface
+      const mapped = employees.map(e => ({
+        ...e,
+        whatsapp: e.phone
+      }));
+      return { success: true, data: mapped };
+    },
+    {
+      detail: { tags: ["Payroll"] }
+    }
+  )
+
+  // ──────────────────────────────────────────────
   // GET /api/payroll — View Payroll History with Details (FR-PAY-15)
   // ──────────────────────────────────────────────
   .get(
